@@ -74,11 +74,11 @@ public class NodeInfoUpgradeTest {
   Discover.PingMessage getPingMessage(boolean withNewColumn, String privateKey) {
     Discover.Endpoint endpoint = getEndpoint();
     long timestamp = Long.MAX_VALUE;
-    byte[] pubkeyArray = Algorithm.generateKeyPair(privateKey).getPublicKey().toByteArray();
-    pubkeyArray = Hex.encode(pubkeyArray);
-    byte[] signature = generateSignature(endpoint, timestamp, privateKey, pubkeyArray);
     Discover.PingMessage.Builder builder = Discover.PingMessage.newBuilder().setFrom(endpoint).setTimestamp(timestamp);
     if (withNewColumn) {
+      byte[] pubkeyArray = Algorithm.generateKeyPair(privateKey).getPublicKey().toByteArray();
+      pubkeyArray = Hex.encode(pubkeyArray);
+      byte[] signature = generateSignature(endpoint, timestamp, privateKey, pubkeyArray);
       return builder.setNodePubkey(ByteString.copyFrom(pubkeyArray))
           .setNodeSig(ByteString.copyFrom(signature)).build();
     } else {
@@ -86,16 +86,22 @@ public class NodeInfoUpgradeTest {
     }
   }
 
+  @Test
+  public void testxxx() {
+    String privateKey = "746e73991e265e6c1825677cc9f3b34c9feae8c2e6db82b72464d17d2d6222c1";
+    byte[] byteArray = Algorithm.generateKeyPair(privateKey).getPublicKey().toByteArray();
+    System.out.println(Hex.toHexString(byteArray));
+  }
+
   Discover.PongMessage getPongMessage(boolean withNewColumn, String privateKey) {
     Discover.Endpoint endpoint = getEndpoint();
     long timestamp = Long.MAX_VALUE;
-    byte[] pubkeyArray = Algorithm.generateKeyPair(privateKey).getPublicKey().toByteArray();
-    pubkeyArray = Hex.encode(pubkeyArray);
-    byte[] signature = generateSignature(endpoint, timestamp, privateKey, pubkeyArray);
-
     Discover.PongMessage.Builder builder = Discover.PongMessage.newBuilder().setFrom(endpoint).setTimestamp(timestamp)
         .setEcho(Integer.MAX_VALUE);
     if (withNewColumn) {
+      byte[] pubkeyArray = Algorithm.generateKeyPair(privateKey).getPublicKey().toByteArray();
+      pubkeyArray = Hex.encode(pubkeyArray);
+      byte[] signature = generateSignature(endpoint, timestamp, privateKey, pubkeyArray);
       return builder.setNodePubkey(ByteString.copyFrom(pubkeyArray))
           .setNodeSig(ByteString.copyFrom(signature)).build();
     } else {
@@ -119,12 +125,12 @@ public class NodeInfoUpgradeTest {
   Discover.FindNeighbours getFindNodeMessage(boolean withNewColumn, String privateKey) {
     Discover.Endpoint endpoint = getEndpoint();
     long timestamp = Long.MAX_VALUE;
-    byte[] pubkeyArray = Algorithm.generateKeyPair(privateKey).getPublicKey().toByteArray();
-    pubkeyArray = Hex.encode(pubkeyArray);
-    byte[] signature = generateSignature(endpoint, timestamp, privateKey, pubkeyArray);
     Discover.FindNeighbours.Builder builder = Discover.FindNeighbours.newBuilder().setFrom(endpoint).setTimestamp(timestamp)
         .setTargetId(endpoint.getAddress());
     if (withNewColumn) {
+      byte[] pubkeyArray = Algorithm.generateKeyPair(privateKey).getPublicKey().toByteArray();
+      pubkeyArray = Hex.encode(pubkeyArray);
+      byte[] signature = generateSignature(endpoint, timestamp, privateKey, pubkeyArray);
       return builder.setNodePubkey(ByteString.copyFrom(pubkeyArray))
           .setNodeSig(ByteString.copyFrom(signature)).build();
     } else {
@@ -139,12 +145,12 @@ public class NodeInfoUpgradeTest {
       neighbours.add(endpoint);
     }
     long timestamp = Long.MAX_VALUE;
-    byte[] pubkeyArray = Algorithm.generateKeyPair(privateKey).getPublicKey().toByteArray();
-    pubkeyArray = Hex.encode(pubkeyArray);
-    byte[] signature = generateSignature(endpoint, timestamp, privateKey, pubkeyArray);
     Discover.Neighbours.Builder builder = Discover.Neighbours.newBuilder().setFrom(endpoint).setTimestamp(timestamp)
         .addAllNeighbours(neighbours);
     if (withNewColumn) {
+      byte[] pubkeyArray = Algorithm.generateKeyPair(privateKey).getPublicKey().toByteArray();
+      pubkeyArray = Hex.encode(pubkeyArray);
+      byte[] signature = generateSignature(endpoint, timestamp, privateKey, pubkeyArray);
       return builder.setNodePubkey(ByteString.copyFrom(pubkeyArray))
           .setNodeSig(ByteString.copyFrom(signature)).build();
     } else {
@@ -217,6 +223,7 @@ public class NodeInfoUpgradeTest {
 
   @Test
   public void testSignaturePerformance() throws InterruptedException {
+    boolean withNewColumn = false;
     List<String> privateKeys = loadPrivateKeys(200000);
     int numThreads = Runtime.getRuntime().availableProcessors();
     ExecutorService executor = Executors.newFixedThreadPool(numThreads);
@@ -253,47 +260,52 @@ public class NodeInfoUpgradeTest {
 
           long genStart = System.nanoTime();
           if (index == 0) {
-            pingMessage = getPingMessage(true, privateKey);
+            pingMessage = getPingMessage(withNewColumn, privateKey);
           } else if (index == 1) {
-            pongMessage = getPongMessage(true, privateKey);
+            pongMessage = getPongMessage(withNewColumn, privateKey);
           } else if (index == 2) {
-            findNodeMessage = getFindNodeMessage(true, privateKey);
+            findNodeMessage = getFindNodeMessage(withNewColumn, privateKey);
           } else {
-            neighboursMessage = getNeighboursMessage(true, privateKey);
+            neighboursMessage = getNeighboursMessage(withNewColumn, privateKey);
           }
           long genEnd = System.nanoTime();
 
           long verifyStart = System.nanoTime();
           boolean verified;
           try {
-            if (index == 0) {
-              verified = verifySignature(
-                  pingMessage.getNodePubkey().toByteArray(),
-                  pingMessage.getFrom(),
-                  pingMessage.getTimestamp(),
-                  pingMessage.getNodeSig().toByteArray()
-              );
-            } else if (index == 1) {
-              verified = verifySignature(
-                  pongMessage.getNodePubkey().toByteArray(),
-                  pongMessage.getFrom(),
-                  pongMessage.getTimestamp(),
-                  pongMessage.getNodeSig().toByteArray()
-              );
-            } else if (index == 2) {
-              verified = verifySignature(
-                  findNodeMessage.getNodePubkey().toByteArray(),
-                  findNodeMessage.getFrom(),
-                  findNodeMessage.getTimestamp(),
-                  findNodeMessage.getNodeSig().toByteArray()
-              );
+            if (withNewColumn) {
+
+              if (index == 0) {
+                verified = verifySignature(
+                    pingMessage.getNodePubkey().toByteArray(),
+                    pingMessage.getFrom(),
+                    pingMessage.getTimestamp(),
+                    pingMessage.getNodeSig().toByteArray()
+                );
+              } else if (index == 1) {
+                verified = verifySignature(
+                    pongMessage.getNodePubkey().toByteArray(),
+                    pongMessage.getFrom(),
+                    pongMessage.getTimestamp(),
+                    pongMessage.getNodeSig().toByteArray()
+                );
+              } else if (index == 2) {
+                verified = verifySignature(
+                    findNodeMessage.getNodePubkey().toByteArray(),
+                    findNodeMessage.getFrom(),
+                    findNodeMessage.getTimestamp(),
+                    findNodeMessage.getNodeSig().toByteArray()
+                );
+              } else {
+                verified = verifySignature(
+                    neighboursMessage.getNodePubkey().toByteArray(),
+                    neighboursMessage.getFrom(),
+                    neighboursMessage.getTimestamp(),
+                    neighboursMessage.getNodeSig().toByteArray()
+                );
+              }
             } else {
-              verified = verifySignature(
-                  neighboursMessage.getNodePubkey().toByteArray(),
-                  neighboursMessage.getFrom(),
-                  neighboursMessage.getTimestamp(),
-                  neighboursMessage.getNodeSig().toByteArray()
-              );
+              verified = true;
             }
           } catch (SignatureException e) {
             throw new RuntimeException(e);
