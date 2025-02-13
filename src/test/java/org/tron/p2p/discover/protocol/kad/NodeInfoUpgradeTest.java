@@ -86,6 +86,11 @@ public class NodeInfoUpgradeTest {
     }
   }
 
+  // signature data
+  byte[] generateSignature(String privateKey, byte[] data) {
+    return Algorithm.sigData(data, privateKey);
+  }
+
   @Test
   public void testxxx() {
     String privateKey = "746e73991e265e6c1825677cc9f3b34c9feae8c2e6db82b72464d17d2d6222c1";
@@ -332,6 +337,135 @@ public class NodeInfoUpgradeTest {
           }
 
 
+          int done = completedTasks.incrementAndGet();
+          if (done % (totalTasks / 10) == 0 || done == totalTasks) {
+            System.out.println("Progress: " + (done * 100 / totalTasks) + "% (" + done + "/" + totalTasks + ")");
+          }
+        } finally {
+          latch.countDown();
+        }
+      }, executor);
+    }
+    latch.await();
+    executor.shutdown();
+
+    System.out.println("✅ Test Completed!");
+    System.out.println("\n===== Average Generation Time (ms) =====");
+    System.out.println("Ping: " + (totalGenTimePing.get() / (totalTasks / 4)) / 1_000_000.0);
+    System.out.println("Pong: " + (totalGenTimePong.get() / (totalTasks / 4)) / 1_000_000.0);
+    System.out.println("FindNode: " + (totalGenTimeFindNode.get() / (totalTasks / 4)) / 1_000_000.0);
+    System.out.println("Neighbours: " + (totalGenTimeNeighbours.get() / (totalTasks / 4)) / 1_000_000.0);
+
+    System.out.println("\n===== Average Verification Time (ms) =====");
+    System.out.println("Ping: " + (totalVerifyTimePing.get() / (totalTasks / 4)) / 1_000_000.0);
+    System.out.println("Pong: " + (totalVerifyTimePong.get() / (totalTasks / 4)) / 1_000_000.0);
+    System.out.println("FindNode: " + (totalVerifyTimeFindNode.get() / (totalTasks / 4)) / 1_000_000.0);
+    System.out.println("Neighbours: " + (totalVerifyTimeNeighbours.get() / (totalTasks / 4)) / 1_000_000.0);
+  }
+
+
+  @Test
+  public void testSignaturePerformance2() throws InterruptedException {
+    boolean withNewColumn = false;
+    List<String> privateKeys = loadPrivateKeys(200000);
+    int numThreads = Runtime.getRuntime().availableProcessors();
+    ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+
+    AtomicLong totalGenTimePing = new AtomicLong();
+    AtomicLong totalGenTimePong = new AtomicLong();
+    AtomicLong totalGenTimeFindNode = new AtomicLong();
+    AtomicLong totalGenTimeNeighbours = new AtomicLong();
+
+    AtomicLong totalVerifyTimePing = new AtomicLong();
+    AtomicLong totalVerifyTimePong = new AtomicLong();
+    AtomicLong totalVerifyTimeFindNode = new AtomicLong();
+    AtomicLong totalVerifyTimeNeighbours = new AtomicLong();
+
+    CountDownLatch latch = new CountDownLatch(privateKeys.size());
+
+    AtomicInteger completedTasks = new AtomicInteger(0);
+    int totalTasks = privateKeys.size();
+
+    for (int i = 0; i < privateKeys.size(); i++) {
+      String privateKey = privateKeys.get(i);
+      final int index = i % 4; // 轮流选择不同的消息类型
+      CompletableFuture.runAsync(() -> {
+        try {
+          byte[] pingMessageBytes = null;
+          byte[] pongMessageBytes = null;
+          byte[] findNodeMessageBytes = null;
+          byte[] neighboursMessageBytes = null;
+
+          Discover.PingMessage pingMessage;
+          Discover.PongMessage pongMessage;
+          Discover.FindNeighbours findNodeMessage;
+          Discover.Neighbours neighboursMessage;
+
+
+          byte[] pingMessageSigBytes = null;
+          byte[] pongMessageSigBytes = null;
+          byte[] findNodeMessageSigBytes = null;
+          byte[] neighboursMessageSigBytes = null;
+
+
+          long genStart = System.nanoTime();
+          if (index == 0) {
+            pingMessage = getPingMessage(withNewColumn, privateKey);
+            pingMessageBytes = pingMessage.toByteArray();
+            pingMessageSigBytes = generateSignature(privateKey, pingMessageBytes);
+
+          } else if (index == 1) {
+            pongMessage = getPongMessage(withNewColumn, privateKey);
+            pongMessageBytes = pongMessage.toByteArray();
+            pongMessageSigBytes = generateSignature(privateKey, pongMessageBytes);
+          } else if (index == 2) {
+            findNodeMessage = getFindNodeMessage(withNewColumn, privateKey);
+            findNodeMessageBytes = findNodeMessage.toByteArray();
+            findNodeMessageSigBytes = generateSignature(privateKey, findNodeMessageBytes);
+          } else {
+            neighboursMessage = getNeighboursMessage(withNewColumn, privateKey);
+            neighboursMessageBytes = neighboursMessage.toByteArray();
+            neighboursMessageSigBytes = generateSignature(privateKey, neighboursMessageBytes);
+          }
+          long genEnd = System.nanoTime();
+
+          boolean verified;
+          byte[] pubkeyArray = Algorithm.generateKeyPair(privateKey).getPublicKey().toByteArray();
+          pubkeyArray = Hex.encode(pubkeyArray);
+          long verifyStart = System.nanoTime();
+          try {
+            if (index == 0) {
+              verified = Algorithm.verifySignature(new String(pubkeyArray), pingMessageBytes, pingMessageSigBytes);
+            } else if (index == 1) {
+              verified = Algorithm.verifySignature(new String(pubkeyArray), pongMessageBytes, pongMessageSigBytes);
+            } else if (index == 2) {
+              verified = Algorithm.verifySignature(new String(pubkeyArray), findNodeMessageBytes, findNodeMessageSigBytes);
+            } else {
+              verified = Algorithm.verifySignature(new String(pubkeyArray), neighboursMessageBytes, neighboursMessageSigBytes);
+            }
+          } catch (SignatureException e) {
+            throw new RuntimeException(e);
+          }
+          long verifyEnd = System.nanoTime();
+
+          if (!verified) {
+            throw new RuntimeException("Signature verification failed for key: " + privateKey);
+          }
+
+          // 统计不同消息类型的耗时
+          if (index == 0) {
+            totalGenTimePing.addAndGet(genEnd - genStart);
+            totalVerifyTimePing.addAndGet(verifyEnd - verifyStart);
+          } else if (index == 1) {
+            totalGenTimePong.addAndGet(genEnd - genStart);
+            totalVerifyTimePong.addAndGet(verifyEnd - verifyStart);
+          } else if (index == 2) {
+            totalGenTimeFindNode.addAndGet(genEnd - genStart);
+            totalVerifyTimeFindNode.addAndGet(verifyEnd - verifyStart);
+          } else {
+            totalGenTimeNeighbours.addAndGet(genEnd - genStart);
+            totalVerifyTimeNeighbours.addAndGet(verifyEnd - verifyStart);
+          }
           int done = completedTasks.incrementAndGet();
           if (done % (totalTasks / 10) == 0 || done == totalTasks) {
             System.out.println("Progress: " + (done * 100 / totalTasks) + "% (" + done + "/" + totalTasks + ")");
