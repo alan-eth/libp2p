@@ -9,6 +9,7 @@ import org.junit.Test;
 import org.tron.p2p.dns.tree.Algorithm;
 import org.tron.p2p.protos.Discover;
 import org.tron.p2p.utils.ByteArray;
+import org.tron.p2p.utils.NetUtil;
 import org.web3j.crypto.Keys;
 
 import java.io.BufferedReader;
@@ -366,6 +367,34 @@ public class NodeInfoUpgradeTest {
     System.out.println("Pong: " + (totalVerifyTimePong.get() / (totalTasks / 4)) / 1_000_000.0);
     System.out.println("FindNode: " + (totalVerifyTimeFindNode.get() / (totalTasks / 4)) / 1_000_000.0);
     System.out.println("Neighbours: " + (totalVerifyTimeNeighbours.get() / (totalTasks / 4)) / 1_000_000.0);
+  }
+
+
+  @Test
+  public void testAverageTimeForNodeIdGenerationAndKeyPairCreation() throws InvalidAlgorithmParameterException, NoSuchAlgorithmException, NoSuchProviderException {
+    int num = 1000000;
+
+    // 计算获取 NodeId 耗时
+    long totalNodeIdTime = 0;
+    for (int i = 0; i < num; i++) {
+      long startTime = System.nanoTime();
+      NetUtil.getNodeId();
+      long endTime = System.nanoTime();
+      totalNodeIdTime += (endTime - startTime);
+    }
+    double avgNodeIdTime = totalNodeIdTime / (double) num / 1_000_000.0;  // 转换为毫秒
+    System.out.println("Average time for getNodeId: " + avgNodeIdTime + " ms");
+
+    // 计算创建密钥对耗时
+    long totalKeyGenerationTime = 0;
+    for (int i = 0; i < num; i++) {
+      long startTime = System.nanoTime();
+      Keys.createEcKeyPair().getPrivateKey();
+      long endTime = System.nanoTime();
+      totalKeyGenerationTime += (endTime - startTime);
+    }
+    double avgKeyGenerationTime = totalKeyGenerationTime / (double) num / 1_000_000.0;  // 转换为毫秒
+    System.out.println("Average time for key generation: " + avgKeyGenerationTime + " ms");
   }
 
 
