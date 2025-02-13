@@ -175,6 +175,9 @@ public class NodeInfoUpgradeTest {
     int pongSize2 = getPongMessage(true, privateKey).getSerializedSize();
     int findNodeSize = getFindNodeMessage(false, privateKey).getSerializedSize();
     int findNodeSize2 = getFindNodeMessage(true, privateKey).getSerializedSize();
+    Discover.Neighbours neighboursMessage = getNeighboursMessage(false, privateKey);
+    byte[] byteArray = neighboursMessage.toByteArray();
+    byte[] signature = generateSignature(privateKey, byteArray);
     int neighboursSize = getNeighboursMessage(false, privateKey).getSerializedSize();
     int neighboursSize2 = getNeighboursMessage(true, privateKey).getSerializedSize();
 
@@ -185,6 +188,8 @@ public class NodeInfoUpgradeTest {
     System.out.println("findNode size: " + findNodeSize);
     System.out.println("findNode size2: " + findNodeSize2);
     System.out.println("neighbours size: " + neighboursSize);
+    System.out.println("neighbours byteArray size: " + byteArray.length);
+    System.out.println("neighbours signature size: " + signature.length);
     System.out.println("neighbours size2: " + neighboursSize2);
   }
 
