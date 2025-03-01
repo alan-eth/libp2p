@@ -68,6 +68,16 @@ public class Algorithm {
     return data;
   }
 
+  public static byte[] sigData(byte[] msg, String privateKey) {
+    ECKeyPair keyPair = generateKeyPair(privateKey);
+    Sign.SignatureData signature = Sign.signMessage(msg, keyPair, true);
+    byte[] data = new byte[65];
+    System.arraycopy(signature.getR(), 0, data, 0, 32);
+    System.arraycopy(signature.getS(), 0, data, 32, 32);
+    data[64] = signature.getV()[0];
+    return data;
+  }
+
   public static BigInteger recoverPublicKey(String msg, byte[] sig) throws SignatureException {
     int recId = sig[64];
     if (recId < 27) {
@@ -78,11 +88,27 @@ public class Algorithm {
     return Sign.signedMessageToKey(msg.getBytes(), signature);
   }
 
+  public static BigInteger recoverPublicKey(byte[] msg, byte[] sig) throws SignatureException {
+    int recId = sig[64];
+    if (recId < 27) {
+      recId += 27;
+    }
+    Sign.SignatureData signature = new SignatureData((byte) recId, ByteArray.subArray(sig, 0, 32),
+        ByteArray.subArray(sig, 32, 64));
+    return Sign.signedMessageToKey(msg, signature);
+  }
+
   /**
    * @param publicKey uncompress hex publicKey
    * @param msg to be hashed message
    */
   public static boolean verifySignature(String publicKey, String msg, byte[] sig)
+      throws SignatureException {
+    BigInteger pubKey = new BigInteger(publicKey, 16);
+    BigInteger pubKeyRecovered = recoverPublicKey(msg, sig);
+    return pubKey.equals(pubKeyRecovered);
+  }
+  public static boolean verifySignature(String publicKey, byte[] msg, byte[] sig)
       throws SignatureException {
     BigInteger pubKey = new BigInteger(publicKey, 16);
     BigInteger pubKeyRecovered = recoverPublicKey(msg, sig);
